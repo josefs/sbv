@@ -13,6 +13,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.SBV.Examples.Puzzles.U2Bridge where
 
@@ -92,7 +94,7 @@ start = Status { time   = 0
                , lLarry = here
                }
 
-instance Mergeable Status where
+instance Mergeable Status SBool where
   symbolicMerge t s1 s2 = Status { time   = symbolicMerge t (time s1)   (time  s2)
                                  , flash  = symbolicMerge t (flash s1)  (flash s2)
                                  , lBono  = symbolicMerge t (lBono s1)  (lBono s2)
@@ -104,7 +106,7 @@ instance Mergeable Status where
 -- | A puzzle move is modeled as a state-transformer
 type Move a = State Status a
 
-instance Mergeable a => Mergeable (Move a) where
+instance Mergeable a SBool => Mergeable (Move a) SBool where
   symbolicMerge t a b
     = do s <- get
          let (ar, s1) = runState a s

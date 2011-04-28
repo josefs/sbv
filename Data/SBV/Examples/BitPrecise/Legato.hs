@@ -32,6 +32,9 @@
 -- is indeed correct.
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
 module Data.SBV.Examples.BitPrecise.Legato where
 
 import Data.Array (Array, Ix(..), (!), (//), array)
@@ -80,7 +83,7 @@ type Extract a = Mostek -> a
 -- | Programs are essentially state transformers (on the machine state)
 type Program = Mostek -> Mostek
 
-instance Mergeable Mostek where
+instance Mergeable Mostek SBool where
   symbolicMerge b m1 m2 = Mostek { memory    = symbolicMerge b (memory m1)    (memory m2)
                                  , registers = symbolicMerge b (registers m1) (registers m2)
                                  , flags     = symbolicMerge b (flags m1)     (flags m2)

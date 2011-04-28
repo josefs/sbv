@@ -17,9 +17,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Data.SBV.BitVectors.Model (
     Mergeable(..), EqSymbolic(..), OrdSymbolic(..), BVDivisible(..), Uninterpreted(..)
+  , ite
   , bitValue, setBitTo, allEqual, allDifferent, oneIf, blastBE, blastLE
   , lsb, msb, SBVUF, sbvUFName, genFree, genFree_
   )
@@ -161,8 +164,8 @@ instance SymWord Int64 where
 --
 -- Minimal complete definition: '.=='
 infix 4 .==, ./=
-class EqSymbolic a where
-  (.==), (./=) :: a -> a -> SBool
+class Boolean bool => EqSymbolic a bool | a -> bool where
+  (.==), (./=) :: a -> a -> bool
   -- minimal complete definition: .==
   x ./= y = bnot (x .== y)
 
@@ -173,15 +176,15 @@ class EqSymbolic a where
 --
 -- Minimal complete definition: '.<'
 infix 4 .<, .<=, .>, .>=
-class (Mergeable a, EqSymbolic a) => OrdSymbolic a where
-  (.<), (.<=), (.>), (.>=) :: a -> a -> SBool
+class (Mergeable a bool, EqSymbolic a bool) => OrdSymbolic a bool | a -> bool where
+  (.<), (.<=), (.>), (.>=) :: a -> a -> bool
   smin, smax :: a -> a -> a
   -- minimal complete definition: .<
   a .<= b    = a .< b ||| a .== b
   a .>  b    = b .<  a
   a .>= b    = b .<= a
-  a `smin` b = ite (a .<= b) a b
-  a `smax` b = ite (a .<= b) b a
+  a `smin` b = symbolicMerge (a .<= b) a b
+  a `smax` b = symbolicMerge (a .<= b) b a
 
 {- We can't have a generic instance of the form:
 
@@ -195,99 +198,154 @@ the right choice obviously; as the Eq instance is bogus for SBV
 for natural reasons..
 -}
 
-instance EqSymbolic (SBV a) where
+instance EqSymbolic (SBV a) SBool where
   (.==) = liftSym2B (mkSymOpSC opt Equal)    (==)
              where opt x y = if x == y then Just trueSW else Nothing
   (./=) = liftSym2B (mkSymOpSC opt NotEqual) (/=)
              where opt x y = if x == y then Just falseSW else Nothing
 
-instance SymWord a => OrdSymbolic (SBV a) where
+instance SymWord a => OrdSymbolic (SBV a) SBool where
   (.<)  = liftSym2B (mkSymOp LessThan)    (<)
   (.<=) = liftSym2B (mkSymOp LessEq)      (<=)
   (.>)  = liftSym2B (mkSymOp GreaterThan) (>)
   (.>=) = liftSym2B (mkSymOp GreaterEq)   (>=)
 
 -- Bool
-instance EqSymbolic Bool where
+instance EqSymbolic Bool SBool where
   x .== y = if x == y then true else false
 
+-- Int
+instance EqSymbolic Int Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Int Bool where
+  x .< y = x < y
+
+instance EqSymbolic Int8 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Int8 Bool where
+  x .< y = x < y
+
+instance EqSymbolic Int16 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Int16 Bool where
+  x .< y = x < y
+
+instance EqSymbolic Int32 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Int32 Bool where
+  x .< y = x < y
+
+instance EqSymbolic Int64 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Int64 Bool where
+  x .< y = x < y
+
+instance EqSymbolic Word8 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Word8 Bool where
+  x .< y = x < y
+
+instance EqSymbolic Word16 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Word16 Bool where
+  x .< y = x < y
+
+instance EqSymbolic Word32 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Word32 Bool where
+  x .< y = x < y
+
+instance EqSymbolic Word64 Bool where
+  x .== y = x == y
+
+instance OrdSymbolic Word64 Bool where
+  x .< y = x < y
+
 -- Lists
-instance EqSymbolic a => EqSymbolic [a] where
+instance EqSymbolic a bool => EqSymbolic [a] bool where
   []     .== []     = true
   (x:xs) .== (y:ys) = x .== y &&& xs .== ys
   _      .== _      = false
 
-instance OrdSymbolic a => OrdSymbolic [a] where
+instance OrdSymbolic a bool => OrdSymbolic [a] bool where
   []     .< []     = false
   []     .< _      = true
   _      .< []     = false
   (x:xs) .< (y:ys) = x .< y ||| (x .== y &&& xs .< ys)
 
 -- Maybe
-instance EqSymbolic a => EqSymbolic (Maybe a) where
+instance EqSymbolic a bool => EqSymbolic (Maybe a) bool where
   Nothing .== Nothing = true
   Just a  .== Just b  = a .== b
   _       .== _       = false
 
-instance (OrdSymbolic a) => OrdSymbolic (Maybe a) where
+instance OrdSymbolic a bool => OrdSymbolic (Maybe a) bool where
   Nothing .<  Nothing = false
   Nothing .<  _       = true
   Just _  .<  Nothing = false
   Just a  .<  Just b  = a .< b
 
 -- Either
-instance (EqSymbolic a, EqSymbolic b) => EqSymbolic (Either a b) where
+instance (EqSymbolic a bool, EqSymbolic b bool) => EqSymbolic (Either a b) bool where
   Left a  .== Left b  = a .== b
   Right a .== Right b = a .== b
   _       .== _       = false
 
-instance (OrdSymbolic a, OrdSymbolic b) => OrdSymbolic (Either a b) where
+instance (OrdSymbolic a bool, OrdSymbolic b bool) => OrdSymbolic (Either a b) bool where
   Left a  .< Left b  = a .< b
   Left _  .< Right _ = true
   Right _ .< Left _  = false
   Right a .< Right b = a .< b
 
 -- 2-Tuple
-instance (EqSymbolic a, EqSymbolic b) => EqSymbolic (a, b) where
+instance (EqSymbolic a bool, EqSymbolic b bool) => EqSymbolic (a, b) bool where
   (a0, b0) .== (a1, b1) = a0 .== a1 &&& b0 .== b1
 
-instance (OrdSymbolic a, OrdSymbolic b) => OrdSymbolic (a, b) where
+instance (OrdSymbolic a bool, OrdSymbolic b bool) => OrdSymbolic (a, b) bool where
   (a0, b0) .< (a1, b1) = a0 .< a1 ||| (a0 .== a1 &&& b0 .< b1)
 
 -- 3-Tuple
-instance (EqSymbolic a, EqSymbolic b, EqSymbolic c) => EqSymbolic (a, b, c) where
+instance (EqSymbolic a bool, EqSymbolic b bool, EqSymbolic c bool) => EqSymbolic (a, b, c) bool where
   (a0, b0, c0) .== (a1, b1, c1) = (a0, b0) .== (a1, b1) &&& c0 .== c1
 
-instance (OrdSymbolic a, OrdSymbolic b, OrdSymbolic c) => OrdSymbolic (a, b, c) where
+instance (OrdSymbolic a bool, OrdSymbolic b bool, OrdSymbolic c bool) => OrdSymbolic (a, b, c) bool where
   (a0, b0, c0) .< (a1, b1, c1) = (a0, b0) .< (a1, b1) ||| ((a0, b0) .== (a1, b1) &&& c0 .< c1)
 
 -- 4-Tuple
-instance (EqSymbolic a, EqSymbolic b, EqSymbolic c, EqSymbolic d) => EqSymbolic (a, b, c, d) where
+instance (EqSymbolic a bool, EqSymbolic b bool, EqSymbolic c bool, EqSymbolic d bool) => EqSymbolic (a, b, c, d) bool where
   (a0, b0, c0, d0) .== (a1, b1, c1, d1) = (a0, b0, c0) .== (a1, b1, c1) &&& d0 .== d1
 
-instance (OrdSymbolic a, OrdSymbolic b, OrdSymbolic c, OrdSymbolic d) => OrdSymbolic (a, b, c, d) where
+instance (OrdSymbolic a bool, OrdSymbolic b bool, OrdSymbolic c bool, OrdSymbolic d bool) => OrdSymbolic (a, b, c, d) bool where
   (a0, b0, c0, d0) .< (a1, b1, c1, d1) = (a0, b0, c0) .< (a1, b1, c1) ||| ((a0, b0, c0) .== (a1, b1, c1) &&& d0 .< d1)
 
 -- 5-Tuple
-instance (EqSymbolic a, EqSymbolic b, EqSymbolic c, EqSymbolic d, EqSymbolic e) => EqSymbolic (a, b, c, d, e) where
+instance (EqSymbolic a bool, EqSymbolic b bool, EqSymbolic c bool, EqSymbolic d bool, EqSymbolic e bool) => EqSymbolic (a, b, c, d, e) bool where
   (a0, b0, c0, d0, e0) .== (a1, b1, c1, d1, e1) = (a0, b0, c0, d0) .== (a1, b1, c1, d1) &&& e0 .== e1
 
-instance (OrdSymbolic a, OrdSymbolic b, OrdSymbolic c, OrdSymbolic d, OrdSymbolic e) => OrdSymbolic (a, b, c, d, e) where
+instance (OrdSymbolic a bool, OrdSymbolic b bool, OrdSymbolic c bool, OrdSymbolic d bool, OrdSymbolic e bool) => OrdSymbolic (a, b, c, d, e) bool where
   (a0, b0, c0, d0, e0) .< (a1, b1, c1, d1, e1) = (a0, b0, c0, d0) .< (a1, b1, c1, d1) ||| ((a0, b0, c0, d0) .== (a1, b1, c1, d1) &&& e0 .< e1)
 
 -- 6-Tuple
-instance (EqSymbolic a, EqSymbolic b, EqSymbolic c, EqSymbolic d, EqSymbolic e, EqSymbolic f) => EqSymbolic (a, b, c, d, e, f) where
+instance (EqSymbolic a bool, EqSymbolic b bool, EqSymbolic c bool, EqSymbolic d bool, EqSymbolic e bool, EqSymbolic f bool) => EqSymbolic (a, b, c, d, e, f) bool where
   (a0, b0, c0, d0, e0, f0) .== (a1, b1, c1, d1, e1, f1) = (a0, b0, c0, d0, e0) .== (a1, b1, c1, d1, e1) &&& f0 .== f1
 
-instance (OrdSymbolic a, OrdSymbolic b, OrdSymbolic c, OrdSymbolic d, OrdSymbolic e, OrdSymbolic f) => OrdSymbolic (a, b, c, d, e, f) where
+instance (OrdSymbolic a bool, OrdSymbolic b bool, OrdSymbolic c bool, OrdSymbolic d bool, OrdSymbolic e bool, OrdSymbolic f bool) => OrdSymbolic (a, b, c, d, e, f) bool where
   (a0, b0, c0, d0, e0, f0) .< (a1, b1, c1, d1, e1, f1) =    (a0, b0, c0, d0, e0) .<  (a1, b1, c1, d1, e1)
                                                        ||| ((a0, b0, c0, d0, e0) .== (a1, b1, c1, d1, e1) &&& f0 .< f1)
 
 -- 7-Tuple
-instance (EqSymbolic a, EqSymbolic b, EqSymbolic c, EqSymbolic d, EqSymbolic e, EqSymbolic f, EqSymbolic g) => EqSymbolic (a, b, c, d, e, f, g) where
+instance (EqSymbolic a bool, EqSymbolic b bool, EqSymbolic c bool, EqSymbolic d bool, EqSymbolic e bool, EqSymbolic f bool, EqSymbolic g bool) => EqSymbolic (a, b, c, d, e, f, g) bool where
   (a0, b0, c0, d0, e0, f0, g0) .== (a1, b1, c1, d1, e1, f1, g1) = (a0, b0, c0, d0, e0, f0) .== (a1, b1, c1, d1, e1, f1) &&& g0 .== g1
 
-instance (OrdSymbolic a, OrdSymbolic b, OrdSymbolic c, OrdSymbolic d, OrdSymbolic e, OrdSymbolic f, OrdSymbolic g) => OrdSymbolic (a, b, c, d, e, f, g) where
+instance (OrdSymbolic a bool, OrdSymbolic b bool, OrdSymbolic c bool, OrdSymbolic d bool, OrdSymbolic e bool, OrdSymbolic f bool, OrdSymbolic g bool) => OrdSymbolic (a, b, c, d, e, f, g) bool where
   (a0, b0, c0, d0, e0, f0, g0) .< (a1, b1, c1, d1, e1, f1, g1) =    (a0, b0, c0, d0, e0, f0) .<  (a1, b1, c1, d1, e1, f1)
                                                                ||| ((a0, b0, c0, d0, e0, f0) .== (a1, b1, c1, d1, e1, f1) &&& g0 .< g1)
 
@@ -379,7 +437,7 @@ instance (Bits a, SymWord a) => Bits (SBV a) where
 
 -- | Replacement for 'testBit'. Since 'testBit' requires a 'Bool' to be returned,
 -- we cannot implement it for symbolic words. Index 0 is the least-significant bit.
-bitValue :: (Bits a, SymWord a) => SBV a -> Int -> SBool
+bitValue :: (Bits a, EqSymbolic a bool) => a -> Int -> bool
 bitValue x i = (x .&. bit i) ./= 0
 
 -- | Generalization of 'setBit' based on a symbolic boolean. Note that 'setBit' and
@@ -481,34 +539,36 @@ instance (SymWord a, Arbitrary a) => Arbitrary (SBV a) where
 -- 'select' is a total-indexing function, with the default.
 --
 -- Minimal complete definition: 'symbolicMerge'
-class Mergeable a where
+class Boolean bool => Mergeable a bool | a -> bool where
    -- | Merge two values based on the condition
-   symbolicMerge :: SBool -> a -> a -> a
-   -- | Choose one or the other element, based on the condition.
-   -- This is similar to 'symbolicMerge', but it has a default
-   -- implementation that makes sure it's short-cut if the condition is concrete
-   ite           :: SBool -> a -> a -> a
+   symbolicMerge :: bool -> a -> a -> a
    -- | Total indexing operation. @select xs default index@ is intuitively
    -- the same as @xs !! index@, except it evaluates to @default@ if @index@
    -- overflows
-   select        :: (Bits b, SymWord b, Integral b) => [a] -> a -> SBV b -> a
+   select        :: (Bits b, HasSignAndSize b, OrdSymbolic b bool, Integral b) => [a] -> a -> b -> a
    -- default definitions
-   ite s a b
-    | Just t <- unliteral s = if t then a else b
-    | True                  = symbolicMerge s a b
    select [] err _   = err
    select xs err ind
-    | hasSign ind    = ite (ind .< 0) err $ result
+    | hasSign ind    = symbolicMerge (ind .< 0) err $ result
     | True           = result
     where result = go xs $ reverse (zip [(0::Integer)..] bits)
           bits   = map (ind `bitValue`) [0 .. bitSize ind - 1]
           go []    _            = err
           go (x:_) []           = x
           go elts  ((n, b):nbs) = let (ys, zs) = genericSplitAt ((2::Integer) ^ n) elts
-                                  in ite b (go zs nbs) (go ys nbs)
+                                  in symbolicMerge b (go zs nbs) (go ys nbs)
+
+-- | Choose one or the other element, based on the condition.
+-- This is similar to 'symbolicMerge', but it has a default
+-- implementation that makes sure it's short-cut if the condition is concrete
+ite :: Mergeable a SBool => SBool -> a -> a -> a
+ite s a b
+    | Just t <- unliteral s = if t then a else b
+    | True                  = symbolicMerge s a b
+
 
 -- SBV
-instance SymWord a => Mergeable (SBV a) where
+instance SymWord a => Mergeable (SBV a) SBool where
   symbolicMerge t a b
    | Just c1 <- unliteral a, Just c2 <- unliteral b, c1 == c2
    = a
@@ -524,28 +584,9 @@ instance SymWord a => Mergeable (SBV a) where
                                if swa == swb
                                   then return swa
                                   else newExpr st sgnsz (SBVApp Ite [swt, swa, swb])
-  -- Custom version of select that translates to SMT-Lib tables at the base type of words
-  select xs err ind
-    | Just i <- unliteral ind
-    = let i' :: Integer
-          i' = fromIntegral i
-      in if i' < 0 || i' >= genericLength xs then err else genericIndex xs i'
-  select [] err _   = err
-  select xs err ind = SBV sgnsz $ Right $ cache r
-     where sind  = sizeOf ind
-           serr  = sizeOf err
-           sgnsz = (hasSign err, serr)
-           r st  = do sws <- mapM (sbvToSW st) xs
-                      swe <- sbvToSW st err
-                      if all (== swe) sws  -- off-chance that all elts are the same
-                         then return swe
-                         else do idx <- getTableIndex st sind serr sws
-                                 swi <- sbvToSW st ind
-                                 let len = length xs
-                                 newExpr st sgnsz (SBVApp (LkUp (idx, sind, sizeOf err, len) swi swe) [])
 
 -- Unit
-instance Mergeable () where
+instance Mergeable () SBool where
    symbolicMerge _ _ _ = ()
    select _ _ _ = ()
 
@@ -553,15 +594,51 @@ instance Mergeable () where
 -- throw exceptions if there is no structural matching of the results
 -- It's a question whether we should really keep them..
 
+instance Mergeable Int Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Int8 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Int16 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Int32 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Int64 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Word8 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Word16 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Word32 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
+instance Mergeable Word64 Bool where
+  symbolicMerge True  x y = x
+  symbolicMerge False x y = y
+
 -- Lists
-instance Mergeable a => Mergeable [a] where
+instance Mergeable a bool => Mergeable [a] bool where
   symbolicMerge t xs ys
     | lxs == lys = zipWith (symbolicMerge t) xs ys
     | True       = error $ "SBV.Mergeable.List: No least-upper-bound for lists of differing size " ++ show (lxs, lys)
     where (lxs, lys) = (length xs, length ys)
 
 -- Maybe
-instance Mergeable a => Mergeable (Maybe a) where
+instance Mergeable a bool => Mergeable (Maybe a) bool where
   symbolicMerge _ Nothing  Nothing  = Nothing
   symbolicMerge t (Just a) (Just b) = Just $ symbolicMerge t a b
   symbolicMerge _ a b = error $ "SBV.Mergeable.Maybe: No least-upper-bound for " ++ show (k a, k b)
@@ -569,7 +646,7 @@ instance Mergeable a => Mergeable (Maybe a) where
             k _       = "Just"
 
 -- Either
-instance (Mergeable a, Mergeable b) => Mergeable (Either a b) where
+instance (Mergeable a bool, Mergeable b bool) => Mergeable (Either a b) bool where
   symbolicMerge t (Left a)  (Left b)  = Left  $ symbolicMerge t a b
   symbolicMerge t (Right a) (Right b) = Right $ symbolicMerge t a b
   symbolicMerge _ a b = error $ "SBV.Mergeable.Either: No least-upper-bound for " ++ show (k a, k b)
@@ -577,7 +654,7 @@ instance (Mergeable a, Mergeable b) => Mergeable (Either a b) where
            k (Right _) = "Right"
 
 -- Arrays
-instance (Ix a, Mergeable b) => Mergeable (Array a b) where
+instance (Ix a, Mergeable b bool) => Mergeable (Array a b) bool where
   symbolicMerge t a b
     | ba == bb = listArray ba (zipWith (symbolicMerge t) (elems a) (elems b))
     | True     = error $ "SBV.Mergeable.Array: No least-upper-bound for rangeSizes" ++ show (k ba, k bb)
@@ -585,47 +662,47 @@ instance (Ix a, Mergeable b) => Mergeable (Array a b) where
           k = rangeSize
 
 -- Functions
-instance Mergeable b => Mergeable (a -> b) where
+instance Mergeable b bool => Mergeable (a -> b) bool where
   symbolicMerge t f g = \x -> symbolicMerge t (f x) (g x)
   select xs err ind   = \x -> select (map ($ x) xs) (err x) ind
 
 -- 2-Tuple
-instance (Mergeable a, Mergeable b) => Mergeable (a, b) where
+instance (Mergeable a bool, Mergeable b bool) => Mergeable (a, b) bool where
   symbolicMerge t (i0, i1) (j0, j1) = (i i0 j0, i i1 j1)
     where i a b = symbolicMerge t a b
   select xs (err1, err2) ind = (select as err1 ind, select bs err2 ind)
     where (as, bs) = unzip xs
 
 -- 3-Tuple
-instance (Mergeable a, Mergeable b, Mergeable c) => Mergeable (a, b, c) where
+instance (Mergeable a bool, Mergeable b bool, Mergeable c bool) => Mergeable (a, b, c) bool where
   symbolicMerge t (i0, i1, i2) (j0, j1, j2) = (i i0 j0, i i1 j1, i i2 j2)
     where i a b = symbolicMerge t a b
   select xs (err1, err2, err3) ind = (select as err1 ind, select bs err2 ind, select cs err3 ind)
     where (as, bs, cs) = unzip3 xs
 
 -- 4-Tuple
-instance (Mergeable a, Mergeable b, Mergeable c, Mergeable d) => Mergeable (a, b, c, d) where
+instance (Mergeable a bool, Mergeable b bool, Mergeable c bool, Mergeable d bool) => Mergeable (a, b, c, d) bool where
   symbolicMerge t (i0, i1, i2, i3) (j0, j1, j2, j3) = (i i0 j0, i i1 j1, i i2 j2, i i3 j3)
     where i a b = symbolicMerge t a b
   select xs (err1, err2, err3, err4) ind = (select as err1 ind, select bs err2 ind, select cs err3 ind, select ds err4 ind)
     where (as, bs, cs, ds) = unzip4 xs
 
 -- 5-Tuple
-instance (Mergeable a, Mergeable b, Mergeable c, Mergeable d, Mergeable e) => Mergeable (a, b, c, d, e) where
+instance (Mergeable a bool, Mergeable b bool, Mergeable c bool, Mergeable d bool, Mergeable e bool) => Mergeable (a, b, c, d, e) bool where
   symbolicMerge t (i0, i1, i2, i3, i4) (j0, j1, j2, j3, j4) = (i i0 j0, i i1 j1, i i2 j2, i i3 j3, i i4 j4)
     where i a b = symbolicMerge t a b
   select xs (err1, err2, err3, err4, err5) ind = (select as err1 ind, select bs err2 ind, select cs err3 ind, select ds err4 ind, select es err5 ind)
     where (as, bs, cs, ds, es) = unzip5 xs
 
 -- 6-Tuple
-instance (Mergeable a, Mergeable b, Mergeable c, Mergeable d, Mergeable e, Mergeable f) => Mergeable (a, b, c, d, e, f) where
+instance (Mergeable a bool, Mergeable b bool, Mergeable c bool, Mergeable d bool, Mergeable e bool, Mergeable f bool) => Mergeable (a, b, c, d, e, f) bool where
   symbolicMerge t (i0, i1, i2, i3, i4, i5) (j0, j1, j2, j3, j4, j5) = (i i0 j0, i i1 j1, i i2 j2, i i3 j3, i i4 j4, i i5 j5)
     where i a b = symbolicMerge t a b
   select xs (err1, err2, err3, err4, err5, err6) ind = (select as err1 ind, select bs err2 ind, select cs err3 ind, select ds err4 ind, select es err5 ind, select fs err6 ind)
     where (as, bs, cs, ds, es, fs) = unzip6 xs
 
 -- 7-Tuple
-instance (Mergeable a, Mergeable b, Mergeable c, Mergeable d, Mergeable e, Mergeable f, Mergeable g) => Mergeable (a, b, c, d, e, f, g) where
+instance (Mergeable a bool, Mergeable b bool, Mergeable c bool, Mergeable d bool, Mergeable e bool, Mergeable f bool, Mergeable g bool) => Mergeable (a, b, c, d, e, f, g) bool where
   symbolicMerge t (i0, i1, i2, i3, i4, i5, i6) (j0, j1, j2, j3, j4, j5, j6) = (i i0 j0, i i1 j1, i i2 j2, i i3 j3, i i4 j4, i i5 j5, i i6 j6)
     where i a b = symbolicMerge t a b
   select xs (err1, err2, err3, err4, err5, err6, err7) ind = (select as err1 ind, select bs err2 ind, select cs err3 ind, select ds err4 ind, select es err5 ind, select fs err6 ind, select gs err7 ind)
@@ -639,13 +716,13 @@ instance (SymWord a, Bounded a) => Bounded (SBV a) where
 -- Arrays
 
 -- SArrays are both "EqSymbolic" and "Mergeable"
-instance EqSymbolic (SArray a b) where
+instance EqSymbolic (SArray a b) SBool where
   (SArray _ a) .== (SArray _ b) = SBV (False, 1) $ Right $ cache c
     where c st = do ai <- uncache a st
                     bi <- uncache b st
                     newExpr st (False, 1) (SBVApp (ArrEq ai bi) [])
 
-instance SymWord b => Mergeable (SArray a b) where
+instance SymWord b => Mergeable (SArray a b) SBool where
   symbolicMerge = mergeArrays
 
 -- SFunArrays are only "Mergeable". Although a brute
@@ -659,7 +736,7 @@ instance SymArray SFunArray where
   writeArray (SFunArray f) a b = SFunArray (\a' -> ite (a .== a') b (f a'))
   mergeArrays t (SFunArray f) (SFunArray g) = SFunArray (\x -> ite t (f x) (g x))
 
-instance SymWord b => Mergeable (SFunArray a b) where
+instance SymWord b => Mergeable (SFunArray a b) SBool where
   symbolicMerge = mergeArrays
 
 -- | An uninterpreted function handle. This is the handle to be used for

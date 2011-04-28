@@ -114,7 +114,7 @@ module Data.SBV (
   -- ** Polynomial arithmetic
   , Polynomial(..)
   -- ** Conditionals: Mergeable values
-  , Mergeable(..)
+  , Mergeable(..), ite
   -- ** Symbolic equality
   , EqSymbolic(..)
   -- ** Symbolic ordering

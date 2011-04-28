@@ -15,6 +15,8 @@
 
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Data.SBV.Examples.PrefixSum.PrefixSum where
 
@@ -77,7 +79,7 @@ lf (zero, f) pl = zipPL (zipWith f (rsh lfpq) p) lfpq
 ----------------------------------------------------------------------
 
 -- | Correctness theorem, for a powerlist of given size, an associative operator, and its left-unit element
-flIsCorrect :: Int -> (forall a. (OrdSymbolic a, Bits a) => (a, a -> a -> a)) -> Symbolic SBool
+flIsCorrect :: Int -> (forall a. (OrdSymbolic a SBool, Bits a) => (a, a -> a -> a)) -> Symbolic SBool
 flIsCorrect n zf = do
         args :: PowerList SWord32 <- mkFreeVars n
         return $ ps zf args .== lf zf args

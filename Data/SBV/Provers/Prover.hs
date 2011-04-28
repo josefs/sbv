@@ -15,6 +15,7 @@
 {-# LANGUAGE OverlappingInstances #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Data.SBV.Provers.Prover (
          SMTSolver(..), SMTConfig(..), Predicate, Provable(..)
@@ -312,41 +313,41 @@ infix 4 ===
 class Equality a where
   (===) :: a -> a -> IO ThmResult
 
-instance (SymWord a, EqSymbolic z) => Equality (SBV a -> z) where
+instance (SymWord a, EqSymbolic z SBool) => Equality (SBV a -> z) where
   k === l = prove $ \a -> k a .== l a
 
-instance (SymWord a, SymWord b, EqSymbolic z) => Equality (SBV a -> SBV b -> z) where
+instance (SymWord a, SymWord b, EqSymbolic z SBool) => Equality (SBV a -> SBV b -> z) where
   k === l = prove $ \a b -> k a b .== l a b
 
-instance (SymWord a, SymWord b, EqSymbolic z) => Equality ((SBV a, SBV b) -> z) where
+instance (SymWord a, SymWord b, EqSymbolic z SBool) => Equality ((SBV a, SBV b) -> z) where
   k === l = prove $ \a b -> k (a, b) .== l (a, b)
 
-instance (SymWord a, SymWord b, SymWord c, EqSymbolic z) => Equality (SBV a -> SBV b -> SBV c -> z) where
+instance (SymWord a, SymWord b, SymWord c, EqSymbolic z SBool) => Equality (SBV a -> SBV b -> SBV c -> z) where
   k === l = prove $ \a b c -> k a b c .== l a b c
 
-instance (SymWord a, SymWord b, SymWord c, EqSymbolic z) => Equality ((SBV a, SBV b, SBV c) -> z) where
+instance (SymWord a, SymWord b, SymWord c, EqSymbolic z SBool) => Equality ((SBV a, SBV b, SBV c) -> z) where
   k === l = prove $ \a b c -> k (a, b, c) .== l (a, b, c)
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, EqSymbolic z) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, EqSymbolic z SBool) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> z) where
   k === l = prove $ \a b c d -> k a b c d .== l a b c d
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, EqSymbolic z) => Equality ((SBV a, SBV b, SBV c, SBV d) -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, EqSymbolic z SBool) => Equality ((SBV a, SBV b, SBV c, SBV d) -> z) where
   k === l = prove $ \a b c d -> k (a, b, c, d) .== l (a, b, c, d)
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, EqSymbolic z) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> SBV e -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, EqSymbolic z SBool) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> SBV e -> z) where
   k === l = prove $ \a b c d e -> k a b c d e .== l a b c d e
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, EqSymbolic z) => Equality ((SBV a, SBV b, SBV c, SBV d, SBV e) -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, EqSymbolic z SBool) => Equality ((SBV a, SBV b, SBV c, SBV d, SBV e) -> z) where
   k === l = prove $ \a b c d e -> k (a, b, c, d, e) .== l (a, b, c, d, e)
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, EqSymbolic z) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> SBV e -> SBV f -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, EqSymbolic z SBool) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> SBV e -> SBV f -> z) where
   k === l = prove $ \a b c d e f -> k a b c d e f .== l a b c d e f
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, EqSymbolic z) => Equality ((SBV a, SBV b, SBV c, SBV d, SBV e, SBV f) -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, EqSymbolic z SBool) => Equality ((SBV a, SBV b, SBV c, SBV d, SBV e, SBV f) -> z) where
   k === l = prove $ \a b c d e f -> k (a, b, c, d, e, f) .== l (a, b, c, d, e, f)
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, SymWord g, EqSymbolic z) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> SBV e -> SBV f -> SBV g -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, SymWord g, EqSymbolic z SBool) => Equality (SBV a -> SBV b -> SBV c -> SBV d -> SBV e -> SBV f -> SBV g -> z) where
   k === l = prove $ \a b c d e f g -> k a b c d e f g .== l a b c d e f g
 
-instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, SymWord g, EqSymbolic z) => Equality ((SBV a, SBV b, SBV c, SBV d, SBV e, SBV f, SBV g) -> z) where
+instance (SymWord a, SymWord b, SymWord c, SymWord d, SymWord e, SymWord f, SymWord g, EqSymbolic z SBool) => Equality ((SBV a, SBV b, SBV c, SBV d, SBV e, SBV f, SBV g) -> z) where
   k === l = prove $ \a b c d e f g -> k (a, b, c, d, e, f, g) .== l (a, b, c, d, e, f, g)

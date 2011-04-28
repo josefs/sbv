@@ -10,13 +10,16 @@
 -- The USB5 CRC implementation
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+
 module Data.SBV.Examples.CRC.USB5 where
 
 import Data.SBV
 
 newtype SWord11 = S11 SWord16
 
-instance EqSymbolic SWord11 where
+instance EqSymbolic SWord11 SBool where
   S11 w .== S11 w' = w .== w'
 
 mkSWord11 :: SWord16 -> SWord11
