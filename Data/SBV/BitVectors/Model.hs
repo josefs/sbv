@@ -10,15 +10,16 @@
 -- Instance declarations for our symbolic world
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-orphans   #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE PatternGuards          #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Rank2Types             #-}
+{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE FlexibleContexts       #-}
 
 module Data.SBV.BitVectors.Model (
     Mergeable(..), EqSymbolic(..), OrdSymbolic(..), BVDivisible(..), Uninterpreted(..)
@@ -199,16 +200,29 @@ for natural reasons..
 -}
 
 instance EqSymbolic (SBV a) SBool where
-  (.==) = liftSym2B (mkSymOpSC opt Equal)    (==)
-             where opt x y = if x == y then Just trueSW else Nothing
-  (./=) = liftSym2B (mkSymOpSC opt NotEqual) (/=)
-             where opt x y = if x == y then Just falseSW else Nothing
+  (.==) = liftSym2B (mkSymOpSC (eqOpt trueSW) Equal)    (==)
+  (./=) = liftSym2B (mkSymOpSC (eqOpt falseSW) NotEqual) (/=)
+
+eqOpt :: SW -> SW -> SW -> Maybe SW
+eqOpt w x y = if x == y then Just w else Nothing
 
 instance SymWord a => OrdSymbolic (SBV a) SBool where
-  (.<)  = liftSym2B (mkSymOp LessThan)    (<)
-  (.<=) = liftSym2B (mkSymOp LessEq)      (<=)
-  (.>)  = liftSym2B (mkSymOp GreaterThan) (>)
-  (.>=) = liftSym2B (mkSymOp GreaterEq)   (>=)
+  x .< y
+    | x `isConcretely` (== maxBound) = false
+    | y `isConcretely` (== minBound) = false
+    | True                           = liftSym2B (mkSymOpSC (eqOpt falseSW) LessThan)    (<)  x y
+  x .<= y
+    | x `isConcretely` (== minBound) = true
+    | y `isConcretely` (== maxBound) = true
+    | True                           = liftSym2B (mkSymOpSC (eqOpt trueSW) LessEq)       (<=) x y
+  x .> y
+    | x `isConcretely` (== minBound) = false
+    | y `isConcretely` (== maxBound) = false
+    | True                           = liftSym2B (mkSymOpSC (eqOpt falseSW) GreaterThan) (>)  x y
+  x .>= y
+    | x `isConcretely` (== maxBound) = true
+    | y `isConcretely` (== minBound) = true
+    | True                           = liftSym2B (mkSymOpSC (eqOpt trueSW) GreaterEq)    (>=) x y
 
 -- Bool
 instance EqSymbolic Bool SBool where
@@ -353,23 +367,37 @@ instance (OrdSymbolic a bool, OrdSymbolic b bool, OrdSymbolic c bool, OrdSymboli
 instance Boolean SBool where
   true  = literal True
   false = literal False
-  bnot  = liftSym1Bool (mkSymOp1 Not) not
-  (&&&) = liftSym2Bool (mkSymOpSC opt And) (&&)
-            where opt x y
-                   | x == falseSW || y == falseSW = Just falseSW
-                   | x == trueSW                  = Just y
-                   | y == trueSW                  = Just x
-                   | True                         = Nothing
-  (|||) = liftSym2Bool (mkSymOpSC opt Or)  (||)
-            where opt x y
-                   | x == trueSW || y == trueSW = Just trueSW
-                   | x == falseSW               = Just y
-                   | y == falseSW               = Just x
-                   | True                       = Nothing
-  (<+>) = liftSym2Bool (mkSymOpSC opt XOr) (<+>)
-            where opt x y
-                   | x == y = Just falseSW
-                   | True   = Nothing
+  bnot  b | b `isConcretely` (== False) = true
+          | b `isConcretely` (== True)  = false
+          | True                        = liftSym1Bool (mkSymOp1 Not) not b
+  a &&& b | a `isConcretely` (== False) || b `isConcretely` (== False) = false
+          | a `isConcretely` (== True)                                 = b
+          | b `isConcretely` (== True)                                 = a
+          | True                                                       = liftSym2Bool (mkSymOpSC opt And) (&&) a b
+          where opt x y
+                 | x == falseSW || y == falseSW = Just falseSW
+                 | x == trueSW                  = Just y
+                 | y == trueSW                  = Just x
+                 | True                         = Nothing
+  a ||| b | a `isConcretely` (== True)  || b `isConcretely` (== True) = true
+          | a `isConcretely` (== False)                               = b
+          | b `isConcretely` (== False)                               = a
+          | True                                                      = liftSym2Bool (mkSymOpSC opt Or)  (||) a b
+          where opt x y
+                 | x == trueSW || y == trueSW = Just trueSW
+                 | x == falseSW               = Just y
+                 | y == falseSW               = Just x
+                 | True                       = Nothing
+  a <+> b | a `isConcretely` (== False) = b
+          | b `isConcretely` (== False) = a
+          | a `isConcretely` (== True)  = bnot b
+          | b `isConcretely` (== True)  = bnot a
+          | True                        = liftSym2Bool (mkSymOpSC opt XOr) (<+>) a b
+          where opt x y
+                 | x == y       = Just falseSW
+                 | x == falseSW = Just y
+                 | y == falseSW = Just x
+                 | True         = Nothing
 
 -- | Returns (symbolic) true if all the elements of the given list are different
 allDifferent :: (Eq a, SymWord a) => [SBV a] -> SBool
@@ -411,10 +439,25 @@ instance (Ord a, Num a, SymWord a) => Num (SBV a) where
 -- NB. The default definition of "testBit" relies on equality,
 -- which is not available for symbolic SBV's. There is no
 -- way to implement testBit to return Bool, obviously; instead use bitValue
+-- Also, in the optimizations below, use of -1 is valid as
+-- -1 has all bits set to True for both signed and unsigned values
 instance (Bits a, SymWord a) => Bits (SBV a) where
-  (.&.)                    = liftSym2 (mkSymOp  And) (.&.)
-  (.|.)                    = liftSym2 (mkSymOp  Or)  (.|.)
-  xor                      = liftSym2 (mkSymOp  XOr) xor
+  x .&. y
+    | x `isConcretely` (== 0)  = 0
+    | x `isConcretely` (== -1) = y
+    | y `isConcretely` (== 0)  = 0
+    | y `isConcretely` (== -1) = x
+    | True                     = liftSym2 (mkSymOp  And) (.&.) x y
+  x .|. y
+    | x `isConcretely` (== 0)  = y
+    | x `isConcretely` (== -1) = -1
+    | y `isConcretely` (== 0)  = x
+    | y `isConcretely` (== -1) = -1
+    | True                     = liftSym2 (mkSymOp  Or)  (.|.) x y
+  x `xor` y
+    | x `isConcretely` (== 0)  = y
+    | y `isConcretely` (== 0)  = x
+    | True                     = liftSym2 (mkSymOp  XOr) xor x y
   complement               = liftSym1 (mkSymOp1 Not) complement
   bitSize  (SBV (_ ,s) _)  = s
   isSigned (SBV (b, _) _)  = b
@@ -429,11 +472,20 @@ instance (Bits a, SymWord a) => Bits (SBV a) where
   rotateL x y
     | y < 0                = rotateR x (-y)
     | y == 0               = x
-    | True                 = liftSym1 (mkSymOp1 (Rol y)) (`rotateL` y) x
+    | True                 = liftSym1 (mkSymOp1 (Rol y)) (rot True (bitSize x) y) x
   rotateR x y
     | y < 0                = rotateL x (-y)
     | y == 0               = x
-    | True                 = liftSym1 (mkSymOp1 (Ror y)) (`rotateR` y) x
+    | True                 = liftSym1 (mkSymOp1 (Ror y)) (rot False (bitSize x) y) x
+
+-- Since the underlying representation is just Integers, rotations has to be careful on the bit-size
+rot :: Bool -> Int -> Int -> Integer -> Integer
+rot toLeft sz amt x
+  | sz < 2 = x
+  | True   = (norm x y') `shiftL` y  .|. norm (x `shiftR` y') y
+  where (y, y') | toLeft = (amt `mod` sz, sz - y)
+                | True   = (sz - y', amt `mod` sz)
+        norm v s = v .&. ((1 `shiftL` s) - 1)
 
 -- | Replacement for 'testBit'. Since 'testBit' requires a 'Bool' to be returned,
 -- we cannot implement it for symbolic words. Index 0 is the least-significant bit.
@@ -461,6 +513,57 @@ lsb x = bitValue x 0
 -- | Most significant bit of a word, always stored at the last position
 msb :: (Bits a, SymWord a) => SBV a -> SBool
 msb x = bitValue x ((sizeOf x) - 1)
+
+-- Enum instance. These instances are suitable for use with concrete values,
+-- and will be less useful for symbolic values around. Note that `fromEnum` requires
+-- a concrete argument for obvious reasons. Other variants (succ, pred, [x..]) etc are similarly
+-- limited. While symbolic variants can be defined for many of these, they will just diverge
+-- as final sizes cannot be determined statically.
+instance (Bounded a, Integral a, Num a, SymWord a) => Enum (SBV a) where
+  succ x
+    | v == (maxBound :: a) = error $ "Enum.succ{" ++ showType x ++ "}: tried to take `succ' of maxBound"
+    | True                 = fromIntegral $ v + 1
+    where v = enumCvt "succ" x
+  pred x
+    | v == (minBound :: a) = error $ "Enum.pred{" ++ showType x ++ "}: tried to take `pred' of minBound"
+    | True                 = fromIntegral $ v - 1
+    where v = enumCvt "pred" x
+  toEnum x
+    | xi < fromIntegral (minBound :: a) || xi > fromIntegral (maxBound :: a)
+    = error $ "Enum.toEnum{" ++ showType r ++ "}: " ++ show x ++ " is out-of-bounds " ++ show (minBound :: a, maxBound :: a)
+    | True
+    = r
+    where xi :: Integer
+          xi = fromIntegral x
+          r  :: SBV a
+          r  = fromIntegral x
+  fromEnum x
+     | r < fromIntegral (minBound :: Int) || r > fromIntegral (maxBound :: Int)
+     = error $ "Enum.fromEnum{" ++ showType x ++ "}:  value " ++ show r ++ " is outside of Int's bounds " ++ show (minBound :: Int, maxBound :: Int)
+     | True
+     = fromIntegral r
+    where r :: Integer
+          r = enumCvt "fromEnum" x
+  enumFrom x = map fromIntegral [xi .. fromIntegral (maxBound :: a)]
+     where xi :: Integer
+           xi = enumCvt "enumFrom" x
+  enumFromThen x y
+     | yi >= xi  = map fromIntegral [xi, yi .. fromIntegral (maxBound :: a)]
+     | True      = map fromIntegral [xi, yi .. fromIntegral (minBound :: a)]
+       where xi, yi :: Integer
+             xi = enumCvt "enumFromThen.x" x
+             yi = enumCvt "enumFromThen.y" y
+  enumFromThenTo x y z = map fromIntegral [xi, yi .. zi]
+       where xi, yi, zi :: Integer
+             xi = enumCvt "enumFromThenTo.x" x
+             yi = enumCvt "enumFromThenTo.y" y
+             zi = enumCvt "enumFromThenTo.z" z
+
+-- | Helper function for use in enum operations
+enumCvt :: (SymWord a, Integral a, Num b) => String -> SBV a -> b
+enumCvt w x = case unliteral x of
+                Nothing -> error $ "Enum." ++ w ++ "{" ++ showType x ++ "}: Called on symbolic value " ++ show x
+                Just v  -> fromIntegral v
 
 -- | The 'BVDivisible' class captures the essence of division of words.
 -- Unfortunately we cannot use Haskell's 'Integral' class since the 'Real'
@@ -718,8 +821,8 @@ instance (SymWord a, Bounded a) => Bounded (SBV a) where
 -- SArrays are both "EqSymbolic" and "Mergeable"
 instance EqSymbolic (SArray a b) SBool where
   (SArray _ a) .== (SArray _ b) = SBV (False, 1) $ Right $ cache c
-    where c st = do ai <- uncache a st
-                    bi <- uncache b st
+    where c st = do ai <- uncacheAI a st
+                    bi <- uncacheAI b st
                     newExpr st (False, 1) (SBVApp (ArrEq ai bi) [])
 
 instance SymWord b => Mergeable (SArray a b) SBool where

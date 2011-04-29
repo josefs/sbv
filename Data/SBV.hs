@@ -101,7 +101,7 @@ module Data.SBV (
   -- *** Signed symbolic bit-vectors
   , SInt8, SInt16, SInt32, SInt64
   -- *** Arrays of symbolic values
-  , SymArray(..), SArray, SFunArray
+  , SymArray(..), SArray, SFunArray, mkSFunArray
   -- ** Operations on symbolic words
   -- *** Word level
   , bitValue, setBitTo, oneIf, lsb, msb
@@ -166,8 +166,24 @@ module Data.SBV (
   -- * Getting SMT-Lib output (for offline analysis)
   , compileToSMTLib
 
-  -- * Compiling symbolic programs to C
-  , compileToC
+  -- * Code generation from symbolic programs
+  -- $cCodeGeneration
+  , SBVCodeGen
+
+  -- ** Setting code-generation options
+  , cgPerformRTCs, cgSetDriverValues
+
+  -- ** Designating inputs
+  , cgInput, cgInputArr
+
+  -- ** Designating outputs
+  , cgOutput, cgOutputArr
+
+  -- ** Designating return values
+  , cgReturn, cgReturnArr
+
+  -- ** Compilation to C
+  , compileToC, compileToCLib
 
   -- * Module exports
   -- $moduleExportIntro
@@ -183,6 +199,7 @@ import Data.SBV.BitVectors.PrettyNum
 import Data.SBV.BitVectors.Polynomial
 import Data.SBV.BitVectors.Splittable
 import Data.SBV.Compilers.C
+import Data.SBV.Compilers.CodeGen
 import Data.SBV.Provers.Prover
 import Data.SBV.Utils.Boolean
 import Data.Bits
@@ -243,6 +260,15 @@ main purpose is so that we can provide custom 'Show' instances to print results 
 While default 'Show' instances are sufficient for most use cases, it is sometimes desirable (especially
 for library construction) that the SMT-models are reinterpreted in terms of domain types. Programmable
 extraction allows getting arbitrarily typed models out of SMT models.
+-}
+
+{- $cCodeGeneration
+The SBV library can generate straight-line executable code in C. (While other target languages are
+certainly possible, currently only C is supported.) The generated code will perform no run-time memory-allocations,
+(no calls to @malloc@), so its memory usage can be predicted ahead of time. Also, the functions will execute precisely the
+same instructions in all calls, so they have predictable timing properties as well. The generated code
+has no loops or jumps, and is typically quite fast. While the generated code can be large due to complete unrolling,
+these characteristics make them suitable for use in hard real-time systems, as well as in traditional computing.
 -}
 
 {- $moduleExportIntro

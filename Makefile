@@ -5,7 +5,7 @@
 
 SRCS = $(shell find . -name '*.hs' -or -name '*.lhs' | grep -v SBVUnitTest/SBVUnitTest.hs)
 
-.PHONY: all install test sdist clean docs gold
+.PHONY: all install test sdist clean docs gold tags
 
 all: install test sdist
 
@@ -14,9 +14,9 @@ install:
 
 test:
 	@echo "Executing inline tests.."
-	@doctest ${SRCS} | grep -v "Could not find documentation" | exit 0
+	@time (doctest ${SRCS} | grep -v "Could not find documentation" | exit 0)
 	@echo "Starting external test suite.."
-	SBVUnitTests
+	@time (SBVUnitTests | cat)
 
 sdist:
 	cabal sdist
@@ -27,7 +27,14 @@ clean:
 docs:
 	cabal haddock --hyperlink-source
 
+configure:
+	cabal configure
+
 release: clean all docs
 
 gold:
-	ghc -idist/build/autogen/ SBVUnitTest/SBVUnitTest.hs -e createGolds
+	ghc -idist/build/autogen/ SBVUnitTest/SBVUnitTest.hs -e "createGolds \"${TGTS}\""
+
+tags:
+	find -name \*.\*hs | xargs hasktags -c
+	sort -o tags tags

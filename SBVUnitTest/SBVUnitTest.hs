@@ -25,51 +25,85 @@ import Data.SBV.Utils.SBVTest  (SBVTestSuite(..), generateGoldCheck)
 import Paths_sbv               (getDataDir)
 
 -- To add a new collection of tests, import below and add to testCollection variable
-import qualified Data.SBV.TestSuite.Arrays.Memory                 as T01(testSuite)
-import qualified Data.SBV.TestSuite.Basics.BasicTests             as T02(testSuite)
-import qualified Data.SBV.TestSuite.Basics.Higher                 as T03(testSuite)
-import qualified Data.SBV.TestSuite.Basics.Index                  as T04(testSuite)
-import qualified Data.SBV.TestSuite.Basics.ProofTests             as T05(testSuite)
-import qualified Data.SBV.TestSuite.Basics.QRem                   as T06(testSuite)
-import qualified Data.SBV.TestSuite.Basics.UnsafeFunctionEquality as T07(testSuite)
-import qualified Data.SBV.TestSuite.BitPrecise.BitTricks          as T08(testSuite)
-import qualified Data.SBV.TestSuite.BitPrecise.Legato             as T09(testSuite)
-import qualified Data.SBV.TestSuite.CRC.CCITT                     as T10(testSuite)
-import qualified Data.SBV.TestSuite.CRC.CCITT_Unidir              as T11(testSuite)
-import qualified Data.SBV.TestSuite.CRC.GenPoly                   as T12(testSuite)
-import qualified Data.SBV.TestSuite.CRC.Parity                    as T13(testSuite)
-import qualified Data.SBV.TestSuite.CRC.USB5                      as T14(testSuite)
-import qualified Data.SBV.TestSuite.Polynomials.Polynomials       as T15(testSuite)
-import qualified Data.SBV.TestSuite.PrefixSum.PrefixSum           as T16(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.DogCatMouse           as T17(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.Euler185              as T18(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.MagicSquare           as T19(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.NQueens               as T20(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.PowerSet              as T21(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.Sudoku                as T22(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.Temperature           as T23(testSuite)
-import qualified Data.SBV.TestSuite.Puzzles.U2Bridge              as T24(testSuite)
-import qualified Data.SBV.TestSuite.Uninterpreted.AUF             as T25(testSuite)
-import qualified Data.SBV.TestSuite.Uninterpreted.Function        as T26(testSuite)
-import qualified Data.SBV.TestSuite.Uninterpreted.Uninterpreted   as T27(testSuite)
+import qualified Data.SBV.TestSuite.Arrays.Memory                  as T01_01(testSuite)
+import qualified Data.SBV.TestSuite.Basics.Arithmetic              as T02_01(testSuite)
+import qualified Data.SBV.TestSuite.Basics.BasicTests              as T02_02(testSuite)
+import qualified Data.SBV.TestSuite.Basics.Higher                  as T02_03(testSuite)
+import qualified Data.SBV.TestSuite.Basics.Index                   as T02_04(testSuite)
+import qualified Data.SBV.TestSuite.Basics.ProofTests              as T02_05(testSuite)
+import qualified Data.SBV.TestSuite.Basics.QRem                    as T02_06(testSuite)
+import qualified Data.SBV.TestSuite.BitPrecise.BitTricks           as T03_01(testSuite)
+import qualified Data.SBV.TestSuite.BitPrecise.Legato              as T03_02(testSuite)
+import qualified Data.SBV.TestSuite.CRC.CCITT                      as T04_01(testSuite)
+import qualified Data.SBV.TestSuite.CRC.CCITT_Unidir               as T04_02(testSuite)
+import qualified Data.SBV.TestSuite.CRC.GenPoly                    as T04_03(testSuite)
+import qualified Data.SBV.TestSuite.CRC.Parity                     as T04_04(testSuite)
+import qualified Data.SBV.TestSuite.CRC.USB5                       as T04_05(testSuite)
+import qualified Data.SBV.TestSuite.CodeGeneration.AddSub          as T05_01(testSuite)
+import qualified Data.SBV.TestSuite.CodeGeneration.CgTests         as T05_02(testSuite)
+import qualified Data.SBV.TestSuite.CodeGeneration.Fibonacci       as T05_03(testSuite)
+import qualified Data.SBV.TestSuite.CodeGeneration.GCD             as T05_04(testSuite)
+import qualified Data.SBV.TestSuite.CodeGeneration.PopulationCount as T05_05(testSuite)
+import qualified Data.SBV.TestSuite.Crypto.AES                     as T06_01(testSuite)
+import qualified Data.SBV.TestSuite.Polynomials.Polynomials        as T07_01(testSuite)
+import qualified Data.SBV.TestSuite.PrefixSum.PrefixSum            as T08_01(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.DogCatMouse            as T09_01(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.Euler185               as T09_02(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.MagicSquare            as T09_03(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.NQueens                as T09_04(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.PowerSet               as T09_05(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.Sudoku                 as T09_06(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.Temperature            as T09_07(testSuite)
+import qualified Data.SBV.TestSuite.Puzzles.U2Bridge               as T09_08(testSuite)
+import qualified Data.SBV.TestSuite.Uninterpreted.AUF              as T10_01(testSuite)
+import qualified Data.SBV.TestSuite.Uninterpreted.Function         as T10_02(testSuite)
+import qualified Data.SBV.TestSuite.Uninterpreted.Uninterpreted    as T10_03(testSuite)
 
-testCollection :: [SBVTestSuite]
+testCollection :: [(String, SBVTestSuite)]
 testCollection = [
-       T01.testSuite, T02.testSuite, T03.testSuite, T04.testSuite
-     , T05.testSuite, T06.testSuite, T07.testSuite, T08.testSuite
-     , T09.testSuite, T10.testSuite, T11.testSuite, T12.testSuite
-     , T13.testSuite, T14.testSuite, T15.testSuite, T16.testSuite
-     , T17.testSuite, T18.testSuite, T19.testSuite, T20.testSuite
-     , T21.testSuite, T22.testSuite, T23.testSuite, T24.testSuite
-     , T25.testSuite, T26.testSuite, T27.testSuite
+       ("mem",         T01_01.testSuite)
+     , ("arith",       T02_01.testSuite)
+     , ("basic",       T02_02.testSuite)
+     , ("higher",      T02_03.testSuite)
+     , ("index",       T02_04.testSuite)
+     , ("proof",       T02_05.testSuite)
+     , ("qrem",        T02_06.testSuite)
+     , ("bitTricks",   T03_01.testSuite)
+     , ("legato",      T03_02.testSuite)
+     , ("ccitt",       T04_01.testSuite)
+     , ("ccitt2",      T04_02.testSuite)
+     , ("genPoly",     T04_03.testSuite)
+     , ("parity",      T04_04.testSuite)
+     , ("usb5",        T04_05.testSuite)
+     , ("addSub",      T05_01.testSuite)
+     , ("cgtest",      T05_02.testSuite)
+     , ("fib",         T05_03.testSuite)
+     , ("gcd",         T05_04.testSuite)
+     , ("popCount",    T05_05.testSuite)
+     , ("aes",         T06_01.testSuite)
+     , ("poly",        T07_01.testSuite)
+     , ("prefixSum",   T08_01.testSuite)
+     , ("dogCatMouse", T09_01.testSuite)
+     , ("euler185",    T09_02.testSuite)
+     , ("magicSquare", T09_03.testSuite)
+     , ("nQueens",     T09_04.testSuite)
+     , ("powerset",    T09_05.testSuite)
+     , ("sudoku",      T09_06.testSuite)
+     , ("temperature", T09_07.testSuite)
+     , ("u2bridge",    T09_08.testSuite)
+     , ("auf1",        T10_01.testSuite)
+     , ("auf2",        T10_02.testSuite)
+     , ("unint",       T10_03.testSuite)
      ]
+
 -- No user serviceable parts below..
 
 main :: IO ()
-main = getArgs >>= run False
+main = do tgts <- getArgs
+          run tgts False []
 
-createGolds :: IO ()
-createGolds = run True ["SBVUnitTest/GoldFiles"]
+createGolds :: String -> IO ()
+createGolds tgts = run (words tgts) True ["SBVUnitTest/GoldFiles"]
 
 checkGoldDir :: FilePath -> IO ()
 checkGoldDir gd = do e <- doesDirectoryExist gd
@@ -108,23 +142,31 @@ checkYicesVersion p =
                                            putStrLn $ "*** However, upgrading to Yices 2.X is highly recommended!"
                                            exitWith $ ExitFailure 1
 
-run :: Bool -> [String] -> IO ()
-run shouldCreate [gd] =
-        do putStrLn $ "*** Starting SBV unit tests..\n*** Gold files at: " ++ show gd
+run :: [String] -> Bool -> [String] -> IO ()
+run targets shouldCreate [gd] =
+        do mapM_ checkTgt targets
+           putStrLn $ "*** Starting SBV unit tests..\n*** Gold files at: " ++ show gd
            checkGoldDir gd
            checkYices
-           let mkTst (SBVTestSuite f) = f $ generateGoldCheck gd shouldCreate
-           cts <- runTestTT $ TestList $ map mkTst testCollection
-           decide cts
-run shouldCreate [] = getDataDir >>= \d -> run shouldCreate[d </> "SBVUnitTest" </> "GoldFiles"]
-run _            _  = error "SBVUnitTests.run: impossible happened!"
+           cts <- runTestTT $ TestList $ map mkTst [c | (tc, c) <- testCollection, select tc]
+           decide shouldCreate cts
+  where mkTst (SBVTestSuite f) = f $ generateGoldCheck gd shouldCreate
+        select tc = null targets || tc `elem` targets
+        checkTgt t | t `elem` allTargets = return ()
+                   | True                = do putStrLn $ "*** Unknown test target: " ++ show t
+                                              exitWith $ ExitFailure 1
+        allTargets = map fst testCollection
+run targets shouldCreate [] = getDataDir >>= \d -> run targets shouldCreate [d </> "SBVUnitTest" </> "GoldFiles"]
+run _       _            _  = error "SBVUnitTests.run: impossible happened!"
 
-decide :: Counts -> IO ()
-decide cts@(Counts c t e f) = do
+decide :: Bool -> Counts -> IO ()
+decide shouldCreate cts@(Counts c t e f) = do
         when (c /= t) $ putStrLn $ "*** Not all test cases were tried. (Only tested " ++ show t ++ " of " ++ show c ++ ")"
         when (e /= 0) $ putStrLn $ "*** " ++ show e ++ " (of " ++ show c ++ ") test cases in error."
         when (f /= 0) $ putStrLn $ "*** " ++ show f ++ " (of " ++ show c ++ ") test cases failed."
         if (c == t && e == 0 && f == 0)
-           then do putStrLn $ "All " ++ show c ++ " test cases successfully passed."
+           then do if shouldCreate
+                      then putStrLn $ "All " ++ show c ++ " test cases executed in gold-file generation mode."
+                      else putStrLn $ "All " ++ show c ++ " test cases successfully passed."
                    exitWith $ ExitSuccess
            else exitWith $ ExitFailure 2
